@@ -1,0 +1,22 @@
+# Игнорируемые файлы и директории
+dist/
+node_modules/
+*.log
+*.lock
+*.min.*
+coverage/
+.chrome/
+.DS_Store
+Thumbs.db
+
+# Иконки и бинарные файлы
+public/icons/*.png
+*.ico
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+
+# Конфигурационные файлы, которые должны сохранять формат
+package-lock.json
