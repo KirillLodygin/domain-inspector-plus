@@ -1,322 +1,46 @@
-<template>
-  <div class="min-h-[400px] p-4 bg-gradient-to-b from-gray-50 to-white">
-    <!-- Заголовок -->
-    <div class="flex items-center justify-between mb-6">
-      <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-          <span class="text-white font-bold text-sm">DI</span>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-gray-900">Domain Inspector</h1>
-          <p class="text-xs text-gray-500">Instant domain information</p>
-        </div>
-      </div>
-      <button
-        @click="openOptions"
-        class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-        title="Settings"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Поле ввода -->
-    <div class="mb-6">
-      <div class="relative">
-        <input
-          v-model="domainInput"
-          @keyup.enter="inspectDomain"
-          type="text"
-          placeholder="Enter domain or IP address..."
-          class="w-full px-4 py-3 pl-11 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-        <div class="absolute left-3 top-3 text-gray-400">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
-        <button
-          @click="inspectDomain"
-          :disabled="!domainInput || loading"
-          class="absolute right-2 top-2 px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Inspect
-        </button>
-      </div>
-      <p class="mt-2 text-xs text-gray-500">
-        You can also highlight any domain on a page and right-click to inspect
-      </p>
-    </div>
-
-    <!-- Состояние загрузки -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-12">
-      <div
-        class="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mb-4"
-      ></div>
-      <p class="text-gray-600">Inspecting domain...</p>
-    </div>
-
-    <!-- Сообщение об ошибке -->
-    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-      <div class="flex items-center">
-        <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800">Error</h3>
-          <div class="mt-2 text-sm text-red-700">
-            <p>{{ error }}</p>
-          </div>
-        </div>
-      </div>
-      <div class="mt-4">
-        <button @click="retry" class="text-sm font-medium text-red-800 hover:text-red-900">
-          Try again
-        </button>
-      </div>
-    </div>
-
-    <!-- Результаты -->
-    <div v-else-if="domainInfo" class="space-y-4">
-      <!-- Заголовок домена -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold text-gray-900">{{ domainInfo.domain }}</h2>
-            <p class="text-sm text-gray-500">Domain information</p>
-          </div>
-          <button
-            @click="copyAllInfo"
-            class="flex items-center space-x-1 px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-              />
-            </svg>
-            <span>Copy All</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Информация о домене -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Регистрация -->
-        <div class="info-card">
-          <h3 class="font-semibold text-gray-900 mb-3 flex items-center">
-            <svg
-              class="w-4 h-4 mr-2 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            Registration
-          </h3>
-          <div class="space-y-2">
-            <div class="info-row">
-              <span class="info-label">Created</span>
-              <span class="info-value">{{ formatDate(domainInfo.created) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Expires</span>
-              <span class="info-value">{{ formatDate(domainInfo.expires) }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Registrar</span>
-              <span class="info-value">{{ domainInfo.registrar || 'N/A' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Сеть -->
-        <div class="info-card">
-          <h3 class="font-semibold text-gray-900 mb-3 flex items-center">
-            <svg
-              class="w-4 h-4 mr-2 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-            Network
-          </h3>
-          <div class="space-y-2">
-            <div class="info-row">
-              <span class="info-label">IP Address</span>
-              <span class="info-value font-mono">{{ domainInfo.ip }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Country</span>
-              <span class="info-value">{{ domainInfo.country }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">AS Number</span>
-              <span class="info-value font-mono">{{ domainInfo.as }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- DNS -->
-        <div class="info-card md:col-span-2">
-          <h3 class="font-semibold text-gray-900 mb-3 flex items-center">
-            <svg
-              class="w-4 h-4 mr-2 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-              />
-            </svg>
-            DNS Servers
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-gray-50 rounded p-3">
-              <div class="text-xs text-gray-500 mb-1">Primary</div>
-              <div class="font-mono text-sm truncate">{{ domainInfo.ns1 || 'Not found' }}</div>
-            </div>
-            <div class="bg-gray-50 rounded p-3">
-              <div class="text-xs text-gray-500 mb-1">Secondary</div>
-              <div class="font-mono text-sm truncate">{{ domainInfo.ns2 || 'Not found' }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Быстрые действия -->
-      <div class="flex space-x-2 pt-4 border-t border-gray-200">
-        <button
-          @click="openWhois"
-          class="flex-1 btn btn-secondary flex items-center justify-center space-x-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-            />
-          </svg>
-          <span>Open WHOIS</span>
-        </button>
-        <button
-          @click="pingDomain"
-          class="flex-1 btn btn-secondary flex items-center justify-center space-x-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span>Ping Test</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Пустое состояние -->
-    <div v-else class="flex flex-col items-center justify-center py-12 text-center">
-      <div class="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
-        <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-          />
-        </svg>
-      </div>
-      <h3 class="text-lg font-semibold text-gray-900 mb-2">No Domain Inspected</h3>
-      <p class="text-gray-600 max-w-xs">
-        Enter a domain above or highlight any domain on a webpage and right-click to inspect.
-      </p>
-    </div>
-
-    <!-- Футер -->
-    <div class="mt-8 pt-4 border-t border-gray-200 text-center">
-      <p class="text-xs text-gray-500">
-        Domain Inspector Plus v{{ version }}
-        <br />
-        <button @click="openOptions" class="text-primary-600 hover:text-primary-800">
-          Settings
-        </button>
-        •
-        <a href="#" @click.prevent="reportBug" class="text-primary-600 hover:text-primary-800">
-          Report Bug
-        </a>
-      </p>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, computed, watch } from 'vue'
   import type { DomainInfo } from '@/lib/types'
-  import { formatDate, copyToClipboard } from '@/lib/utils'
+  import { formatDate, getCountryName, formatNS, copyToClipboard } from '@/lib/utils'
+  import { inspectDomain as apiInspectDomain } from '@/lib/api'
 
   const version = '0.1.0'
   const loading = ref(false)
   const error = ref('')
   const domainInput = ref('')
   const domainInfo = ref<DomainInfo | null>(null)
+  const copyStatus = ref('')
 
   // Инициализация
   onMounted(() => {
-    // Получаем домен из storage, если есть
     chrome.storage.local.get(['lastDomain'], result => {
       if (result.lastDomain) {
         domainInput.value = result.lastDomain
-        inspectDomain()
         chrome.storage.local.remove('lastDomain')
       }
     })
+
+    // Listen for Escape key
+    window.addEventListener('keydown', handleGlobalKeydown)
   })
+
+  // Watch domain property to trigger automatic requests
+  watch(domainInput, (newVal) => {
+    if (newVal && isValidDomain(newVal)) {
+      inspectDomain()
+    }
+  })
+
+  const isValidDomain = (domain: string) => {
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+    return domainRegex.test(domain);
+  }
+
+  const handleGlobalKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closePopup()
+    }
+  }
 
   // Проверка домена
   const inspectDomain = async () => {
@@ -324,26 +48,17 @@
 
     loading.value = true
     error.value = ''
+    domainInfo.value = null
 
     try {
-      // TODO: Заменить на реальный API вызов
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Тестовые данные для разработки
-      domainInfo.value = {
-        domain: domainInput.value,
-        created: '2020-01-15',
-        expires: '2025-01-15',
-        registrar: 'GoDaddy',
-        ip: '93.184.216.34',
-        country: 'United States',
-        as: 'AS15169 Google',
-        ns1: 'ns1.example.com',
-        ns2: 'ns2.example.com',
+      const response = await apiInspectDomain(domainInput.value.trim())
+      if (response.success && response.data) {
+        domainInfo.value = response.data
+      } else {
+        error.value = response.error || 'Failed to inspect domain'
       }
     } catch (err) {
-      error.value = 'Failed to inspect domain. Please try again.'
-      console.error(err)
+      error.value = 'Connection error'
     } finally {
       loading.value = false
     }
@@ -353,45 +68,208 @@
   const copyAllInfo = async () => {
     if (!domainInfo.value) return
 
-    const text = Object.entries(domainInfo.value)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n')
+    const { primary, othersCount } = formatNS(domainInfo.value.ns)
+    const nsText = othersCount > 0 
+      ? `${primary.join(', ')} and ${othersCount} more`
+      : primary.join(', ')
+
+    const text = [
+      `Domain: ${domainInfo.value.domain}`,
+      `Created: ${formatDate(domainInfo.value.created)}`,
+      `Expires: ${formatDate(domainInfo.value.expires)}`,
+      `Registrar: ${domainInfo.value.registrar}`,
+      `IP: ${domainInfo.value.ip}`,
+      `Country: ${getCountryName(domainInfo.value.country)}`,
+      `ASN: ${domainInfo.value.asn}`,
+      `NS: ${nsText}`
+    ].join('\n')
 
     const success = await copyToClipboard(text)
     if (success) {
-      // Показать уведомление об успехе
-      alert('Domain information copied to clipboard!')
+      copyStatus.value = 'Copied!'
+      setTimeout(() => copyStatus.value = '', 2000)
     }
   }
 
-  // Действия
-  const openWhois = () => {
-    if (domainInfo.value?.domain) {
-      window.open(`https://whois.domaintools.com/${domainInfo.value.domain}`, '_blank')
-    }
-  }
-
-  const pingDomain = () => {
-    if (domainInfo.value?.domain) {
-      window.open(`https://ping.pe/${domainInfo.value.domain}`, '_blank')
-    }
-  }
-
-  const openOptions = () => {
-    chrome.runtime.openOptionsPage()
-  }
-
-  const reportBug = () => {
-    window.open('https://github.com/yourusername/domain-inspector-plus/issues', '_blank')
+  const closePopup = () => {
+    window.close()
   }
 
   const retry = () => {
     error.value = ''
-    if (domainInput.value) {
-      inspectDomain()
-    }
+    inspectDomain()
   }
+
+  const formattedNS = computed(() => {
+    if (!domainInfo.value?.ns) return { primary: [], othersCount: 0 }
+    return formatNS(domainInfo.value.ns)
+  })
 </script>
+
+<template>
+  <div class="w-[400px] max-h-[600px] bg-white text-gray-900 font-sans relative flex flex-col overflow-hidden">
+    <!-- Close Button -->
+    <button 
+      @click="closePopup" 
+      class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 p-1"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+
+    <!-- Header -->
+    <div class="p-6 pb-4 border-b border-gray-100 bg-gray-50/50">
+      <div class="flex items-center space-x-3 mb-4">
+        <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-200">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-gray-900 leading-tight">Domain Inspector+</h1>
+          <p class="text-xs text-gray-500 font-medium">Professional Domain Analysis</p>
+        </div>
+      </div>
+
+      <!-- Input Section -->
+      <div class="relative">
+        <input
+          v-model="domainInput"
+          @keyup.enter="inspectDomain"
+          type="text"
+          placeholder="Enter domain (e.g. google.com)"
+          class="w-full pl-4 pr-12 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none shadow-sm"
+        />
+        <button 
+          @click="inspectDomain"
+          :disabled="loading || !domainInput"
+          class="absolute right-2 top-1.5 p-1.5 text-primary-600 hover:bg-primary-50 rounded-md disabled:opacity-30"
+        >
+          <svg v-if="!loading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <div v-else class="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 p-6 overflow-y-auto">
+      <!-- Empty State -->
+      <div v-if="!loading && !domainInfo && !error" class="flex flex-col items-center justify-center py-10 text-center">
+        <div class="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mb-4 text-primary-500">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-800">Ready to Inspect</h3>
+        <p class="text-xs text-gray-500 mt-1 px-8">Enter a domain above or use context menu on any website to see instant details.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="space-y-4">
+        <div class="h-20 bg-gray-50 rounded-xl animate-pulse"></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="h-24 bg-gray-50 rounded-xl animate-pulse"></div>
+          <div class="h-24 bg-gray-50 rounded-xl animate-pulse"></div>
+        </div>
+        <div class="h-32 bg-gray-50 rounded-xl animate-pulse"></div>
+      </div>
+
+      <!-- Error State -->
+      <div v-if="error && !loading" class="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+        <div class="text-red-500 mb-2">
+          <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <p class="text-sm font-medium text-red-800">{{ error }}</p>
+        <button @click="retry" class="mt-3 px-4 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors">
+          Retry Analysis
+        </button>
+      </div>
+
+      <!-- Result State -->
+      <div v-if="domainInfo && !loading" class="space-y-4">
+        <!-- Success Header -->
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-base font-bold text-gray-800 flex items-center">
+            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+            Analysis Complete
+          </h2>
+          <button @click="copyAllInfo" class="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center">
+            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            {{ copyStatus || 'Copy All Data' }}
+          </button>
+        </div>
+
+        <!-- Cards -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Registration</p>
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-500">Created:</span>
+                <span class="font-semibold text-gray-700">{{ formatDate(domainInfo.created) }}</span>
+              </div>
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-500">Expires:</span>
+                <span class="font-semibold text-gray-700">{{ formatDate(domainInfo.expires) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Network</p>
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-500">IP:</span>
+                <span class="font-semibold text-gray-700 font-mono">{{ domainInfo.ip }}</span>
+              </div>
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-500">Region:</span>
+                <span class="font-semibold text-gray-700">{{ getCountryName(domainInfo.country) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 bg-primary-50/50 rounded-xl border border-primary-100">
+          <p class="text-[10px] font-bold text-primary-400 uppercase tracking-wider mb-2">Technical Details</p>
+          <div class="space-y-2">
+            <div>
+              <p class="text-[11px] text-primary-600 font-medium">Registrar</p>
+              <p class="text-sm font-semibold text-gray-800">{{ domainInfo.registrar }}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-primary-600 font-medium">ASN</p>
+              <p class="text-sm font-semibold text-gray-800 font-mono">{{ domainInfo.asn }}</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-primary-600 font-medium">DNS Servers</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                <span v-for="ns in formattedNS.primary" :key="ns" class="px-2 py-0.5 bg-white border border-primary-100 text-primary-700 text-[10px] font-mono rounded-md shadow-sm">
+                  {{ ns }}
+                </span>
+                <span v-if="formattedNS.othersCount > 0" class="text-[10px] text-gray-400 font-medium self-center ml-1">
+                  +{{ formattedNS.othersCount }} more
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
+      <p class="text-[10px] text-gray-400 font-medium">Domain Inspector+ v{{ version }} • Powered by Vercel API</p>
+    </div>
+  </div>
+</template>
 
 <style scoped>
   /* Стили компонента */

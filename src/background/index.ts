@@ -112,22 +112,19 @@ function handleRuntimeMessage(
       handleInspectDomain(message.domain, sender.tab?.id)
       break
 
-    case 'GET_DOMAIN_INFO':
-      // TODO: Интеграция с бэкендом
-      sendResponse({
-        success: true,
-        data: getMockDomainInfo(message.domain),
-        cached: false,
+    case 'GET_LAST_DOMAIN':
+      browser.storage.local.get('lastDomain').then((result: any) => {
+        sendResponse({ domain: result.lastDomain || '' })
       })
-      break
+      return true
 
     case 'TOGGLE_FEATURE':
       state.isEnabled = message.enabled
       browser.storage.local.set({ isEnabled: message.enabled })
 
       // Отправляем обновление во все вкладки
-      browser.tabs.query({}).then(tabs => {
-        tabs.forEach(tab => {
+      browser.tabs.query({}).then((tabs: any[]) => {
+        tabs.forEach((tab: any) => {
           if (tab.id) {
             browser.tabs
               .sendMessage(tab.id, {
@@ -163,25 +160,40 @@ async function handleInspectDomain(domain: string, tabId?: number): Promise<void
   await browser.storage.local.set({ lastDomain: domain })
 
   // Обновляем badge
-  await browser.action.setBadgeText({
-    text: '✓',
-    tabId,
-  })
+  if (tabId) {
+    await browser.action.setBadgeText({
+      text: '✓',
+      tabId,
+    })
 
-  await browser.action.setBadgeBackgroundColor({
-    color: '#10B981',
-    tabId,
-  })
+    await browser.action.setBadgeBackgroundColor({
+      color: '#10B981',
+      tabId,
+    })
 
-  // Сбрасываем badge через 3 секунды
-  setTimeout(() => {
-    browser.action
-      .setBadgeText({
-        text: '',
-        tabId,
-      })
-      .catch(() => {})
-  }, 3000)
+    // Сбрасываем badge через 3 секунды
+    setTimeout(() => {
+      browser.action
+        .setBadgeText({
+          text: '',
+          tabId,
+        })
+        .catch(() => {})
+    }, 3000)
+  }
+
+  // Открываем popup
+  try {
+    await (browser.action as any).openPopup()
+  } catch (error) {
+    console.warn('Could not open popup automatically, showing notification')
+    browser.notifications.create({
+      type: 'basic',
+      iconUrl: browser.runtime.getURL('icons/icon-48.png'),
+      title: 'Domain Inspector+',
+      message: `Domain ${domain} is ready for inspection. Click the extension icon.`,
+    })
+  }
 }
 
 /**

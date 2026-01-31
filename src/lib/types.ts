@@ -5,9 +5,8 @@ export interface DomainInfo {
     registrar: string;
     ip: string;
     country: string;
-    as: string;
-    ns1: string;
-    ns2: string;
+    asn: string;
+    ns: string[];
 }
 
 export interface ApiResponse {

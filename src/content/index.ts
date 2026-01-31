@@ -1,38 +1,49 @@
 import browser from 'webextension-polyfill'
-import { extractDomain, isValidDomain } from '@/lib/utils'
+import { extractDomain, isValidDomain, formatDate } from '@/lib/utils'
+import { inspectDomain } from '@/lib/api'
 
 // Конфигурация
 const CONFIG = {
-  highlightClass: 'domain-inspector-highlight',
+  highlightClass: 'domain-highlight',
   popupClass: 'domain-inspector-popup',
   enabled: true,
-  highlightColor: 'rgba(59, 130, 246, 0.1)',
-  borderColor: '#3b82f6',
 }
 
 // Состояние
 let observer: MutationObserver | null = null
 let highlightedElements: HTMLElement[] = []
 let activePopup: HTMLElement | null = null
+let hideTimeout: number | null = null
+let mutationTimeout: number | null = null
 
 /**
- * Находит все текстовые узлы с доменами
+ * Дебаунс для обработки изменений DOM
  */
+function debouncedHighlight(): void {
+  if (mutationTimeout) {
+    clearTimeout(mutationTimeout)
+  }
+  mutationTimeout = window.setTimeout(() => {
+    const domainNodes = findDomainNodes()
+    domainNodes.forEach(({ node, domain }) => {
+      highlightDomain(node, domain)
+    })
+    mutationTimeout = null
+  }, 500)
+}
 function findDomainNodes(): { node: Node; domain: string }[] {
   const results: { node: Node; domain: string }[] = []
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null)
+  const domainRegex = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/gi;
 
   let node: Node | null
   while ((node = walker.nextNode())) {
-    if (node.textContent && node.parentNode) {
+    if (node.textContent && node.parentNode && !(node.parentNode as HTMLElement).closest(`.${CONFIG.highlightClass}`)) {
       const text = node.textContent
-      const words = text.split(/\s+/)
-
-      for (const word of words) {
-        const domain = extractDomain(word)
-        if (domain && isValidDomain(domain)) {
-          results.push({ node, domain })
-          break // Нашли домен в этом узле, переходим к следующему
+      if (domainRegex.test(text)) {
+        const match = text.match(domainRegex);
+        if (match) {
+          results.push({ node, domain: extractDomain(match[0]) || '' })
         }
       }
     }
@@ -49,36 +60,57 @@ function highlightDomain(node: Node, domain: string): void {
 
   const text = node.textContent || ''
   const regex = new RegExp(
-    `(?:https?:\\/\\/)?(?:www\\.)?(${domain.replace('.', '\\.')})(?![\\w-])`,
+    `((?:https?:\\/\\/)?(?:www\\.)?${domain.replace('.', '\\.')}(?![\\w-]))`,
     'gi'
   )
 
   if (!regex.test(text)) return
 
-  const span = document.createElement('span')
-  span.className = CONFIG.highlightClass
-  span.dataset.domain = domain
-  span.dataset.originalText = text
+  const fragment = document.createDocumentFragment()
+  let lastIndex = 0
+  let match
 
-  // Восстанавливаем текст с подсветкой
-  span.innerHTML = text.replace(
-    regex,
-    match => `<span class="${CONFIG.highlightClass}-inner">${match}</span>`
-  )
+  regex.lastIndex = 0 // Reset regex
+  while ((match = regex.exec(text)) !== null) {
+    // Текст до совпадения
+    if (match.index > lastIndex) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
+    }
 
-  node.parentNode.replaceChild(span, node)
-  highlightedElements.push(span)
+    // Подсвеченный домен
+    const span = document.createElement('span')
+    span.className = CONFIG.highlightClass
+    span.dataset.domain = domain
+    span.dataset.originalText = match[0]
+    span.textContent = match[0]
 
-  // Добавляем обработчики событий
-  span.addEventListener('mouseenter', handleDomainHover)
-  span.addEventListener('mouseleave', handleDomainLeave)
-  span.addEventListener('click', handleDomainClick)
+    // Добавляем обработчики событий
+    span.addEventListener('mouseenter', handleDomainHover)
+    span.addEventListener('mouseleave', handleDomainLeave)
+    span.addEventListener('click', (e) => handleDomainClick(e, domain))
+
+    fragment.appendChild(span)
+    highlightedElements.push(span)
+    lastIndex = regex.lastIndex
+  }
+
+  // Оставшийся текст
+  if (lastIndex < text.length) {
+    fragment.appendChild(document.createTextNode(text.slice(lastIndex)))
+  }
+
+  node.parentNode.replaceChild(fragment, node)
 }
 
 /**
  * Обработчик наведения на домен
  */
 function handleDomainHover(event: Event): void {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+    hideTimeout = null
+  }
+
   const target = event.currentTarget as HTMLElement
   const domain = target.dataset.domain
 
@@ -91,19 +123,26 @@ function handleDomainHover(event: Event): void {
 /**
  * Обработчик ухода мыши с домена
  */
-function handleDomainLeave(): void {
-  hideTooltip()
+function handleDomainLeave(event: MouseEvent): void {
+  const relatedTarget = event.relatedTarget as HTMLElement;
+  if (relatedTarget && relatedTarget.closest(`.${CONFIG.popupClass}`)) {
+    return;
+  }
+
+  hideTimeout = window.setTimeout(() => {
+    hideTooltip()
+  }, 300)
 }
 
 /**
  * Обработчик клика по домену
  */
-function handleDomainClick(event: Event): void {
+function handleDomainClick(event: Event, domainOverride?: string): void {
   event.preventDefault()
   event.stopPropagation()
 
   const target = event.currentTarget as HTMLElement
-  const domain = target.dataset.domain
+  const domain = domainOverride || target.dataset.domain
 
   if (!domain) return
 
@@ -122,34 +161,83 @@ function handleDomainClick(event: Event): void {
 /**
  * Показывает всплывающую подсказку
  */
-function showTooltip(element: HTMLElement, domain: string): void {
-  hideTooltip()
+async function showTooltip(element: HTMLElement, domain: string): Promise<void> {
+  if (activePopup) {
+    if (activePopup.dataset.domain === domain) return
+    hideTooltip()
+  }
 
   const rect = element.getBoundingClientRect()
   const popup = document.createElement('div')
   popup.className = CONFIG.popupClass
+  popup.dataset.domain = domain
 
+  // Обработчики для самого попапа, чтобы он не закрывался при наведении
+  popup.addEventListener('mouseenter', () => {
+    if (hideTimeout) {
+      clearTimeout(hideTimeout)
+      hideTimeout = null
+    }
+  })
+  popup.addEventListener('mouseleave', () => {
+    hideTimeout = window.setTimeout(() => {
+      hideTooltip()
+    }, 300)
+  })
+
+  // Позиционирование
+  const popupWidth = 240
+  const popupHeight = 40
+  let left = rect.left + window.scrollX
+  let top = rect.top + window.scrollY - popupHeight - 10
+  let arrowClass = '';
+
+  // Проверка границ экрана
+  if (left + popupWidth > window.innerWidth) {
+    left = window.innerWidth - popupWidth - 20
+  }
+  
+  if (top < window.scrollY) {
+    top = rect.top + window.scrollY + rect.height + 10
+    arrowClass = 'tooltip-arrow-top';
+  }
+
+  popup.style.position = 'fixed'
+  popup.style.left = `${left}px`
+  popup.style.top = `${top}px`
+  popup.style.zIndex = '2147483647'
+
+  // Начальное состояние
   popup.innerHTML = `
-    <div class="domain-tooltip">
-      <div class="domain-name">${domain}</div>
-      <div class="domain-action">Click to inspect</div>
+    <div class="domain-tooltip ${arrowClass}">
+      <div class="tooltip-content">
+        <div class="domain-name">${domain}</div>
+        <button class="inspect-btn">Inspect</button>
+      </div>
     </div>
   `
 
-  // Позиционирование
-  popup.style.position = 'fixed'
-  popup.style.left = `${rect.left + window.scrollX}px`
-  popup.style.top = `${rect.top + window.scrollY - 40}px`
-  popup.style.zIndex = '10000'
-
   document.body.appendChild(popup)
   activePopup = popup
+
+  // Обработчик кнопки инспекции
+  const inspectBtn = popup.querySelector('.inspect-btn')
+  inspectBtn?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    handleDomainClick(e, domain)
+    hideTooltip()
+  })
 }
 
 /**
  * Скрывает всплывающую подсказку
  */
 function hideTooltip(): void {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+    hideTimeout = null
+  }
+  
   if (activePopup && activePopup.parentNode) {
     activePopup.parentNode.removeChild(activePopup)
     activePopup = null
@@ -172,21 +260,16 @@ function initHighlighting(): void {
   observer = new MutationObserver(mutations => {
     if (!CONFIG.enabled) return
 
+    let shouldUpdate = false
     mutations.forEach(mutation => {
-      if (mutation.type === 'childList') {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-            const domain = extractDomain(node.textContent)
-            if (domain && isValidDomain(domain)) {
-              highlightDomain(node, domain)
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            // Рекурсивно обрабатываем добавленные элементы
-            processElement(node as HTMLElement)
-          }
-        })
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        shouldUpdate = true
       }
     })
+
+    if (shouldUpdate) {
+      debouncedHighlight()
+    }
   })
 
   observer.observe(document.body, {
@@ -222,44 +305,84 @@ function addStyles(): void {
   const style = document.createElement('style')
   style.textContent = `
     .${CONFIG.highlightClass} {
-      position: relative;
+      background-color: rgba(59, 130, 246, 0.1);
+      border-bottom: 2px solid #3b82f6;
       cursor: pointer;
-    }
-    
-    .${CONFIG.highlightClass}-inner {
-      background-color: ${CONFIG.highlightColor};
-      border-bottom: 2px solid ${CONFIG.borderColor};
-      padding: 0 2px;
       border-radius: 2px;
-      transition: all 0.2s ease;
+      padding: 0 1px;
+      transition: background-color 0.2s;
     }
     
-    .${CONFIG.highlightClass}:hover .${CONFIG.highlightClass}-inner {
+    .${CONFIG.highlightClass}:hover {
       background-color: rgba(59, 130, 246, 0.2);
     }
     
-    .${CONFIG.popupClass} .domain-tooltip {
-      background: white;
-      border: 1px solid #e5e7eb;
+    .${CONFIG.popupClass} {
+      position: fixed;
+      z-index: 2147483647;
+      pointer-events: auto;
+    }
+
+    .domain-tooltip {
+      background: #1f2937;
+      color: white;
       border-radius: 6px;
       padding: 8px 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      font-family: 'Inter', sans-serif;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 12px;
-      animation: fadeIn 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      animation: fadeIn 0.15s ease-out;
+      position: relative;
+    }
+
+    .domain-tooltip::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 20px;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid #1f2937;
+    }
+
+    .tooltip-arrow-top::after {
+      bottom: auto;
+      top: -6px;
+      border-top: none;
+      border-bottom: 6px solid #1f2937;
+    }
+
+    .tooltip-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     
-    .${CONFIG.popupClass} .domain-name {
+    .domain-name {
       font-weight: 600;
-      color: #111827;
-      margin-bottom: 2px;
+      color: white;
+      white-space: nowrap;
     }
     
-    .${CONFIG.popupClass} .domain-action {
-      color: #6b7280;
+    .inspect-btn {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 3px 8px;
       font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
     }
-    
+
+    .inspect-btn:hover {
+      background-color: #2563eb;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
@@ -315,7 +438,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Обработка сообщений от background script
-browser.runtime.onMessage.addListener(message => {
+browser.runtime.onMessage.addListener((message: any) => {
   if (message.type === 'TOGGLE_HIGHLIGHT') {
     CONFIG.enabled = message.enabled
     if (CONFIG.enabled) {

@@ -4,7 +4,7 @@ export const config = {
   appVersion: import.meta.env.VITE_APP_VERSION || '0.1.0',
 
   // API
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://domain-inspector-backend.vercel.app',
   apiTimeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10),
   useMockApi: import.meta.env.VITE_API_MOCK === 'true',
 
