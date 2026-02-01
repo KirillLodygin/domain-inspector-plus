@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply bg-sage-50 text-sage-900 font-sans;
     width: 400px;
     min-height: 300px;
   }
@@ -20,23 +20,23 @@
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
+    @apply bg-sage-200 text-sage-800 hover:bg-sage-300 active:bg-sage-400;
   }
 
   .info-card {
-    @apply bg-white rounded-lg border border-gray-200 p-4 shadow-sm;
+    @apply bg-white rounded-lg border border-sage-200 p-4 shadow-sm;
   }
 
   .info-row {
-    @apply flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0;
+    @apply flex justify-between items-center py-2 border-b border-sage-100 last:border-b-0;
   }
 
   .info-label {
-    @apply text-sm font-medium text-gray-600;
+    @apply text-sm font-medium text-sage-600;
   }
 
   .info-value {
-    @apply text-sm font-mono text-gray-900 truncate max-w-[200px];
+    @apply text-sm font-mono text-sage-900 truncate max-w-[200px];
   }
 
   .domain-highlight {

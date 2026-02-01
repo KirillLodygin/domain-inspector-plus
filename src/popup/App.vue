@@ -114,11 +114,11 @@
 </script>
 
 <template>
-  <div class="w-[400px] max-h-[600px] bg-white text-gray-900 font-sans relative flex flex-col overflow-hidden">
+  <div class="w-[400px] max-h-[600px] bg-sage-50 text-sage-900 font-sans relative flex flex-col overflow-hidden">
     <!-- Close Button -->
     <button 
       @click="closePopup" 
-      class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 p-1"
+      class="absolute top-4 right-4 text-sage-400 hover:text-sage-600 z-10 p-1"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -126,16 +126,14 @@
     </button>
 
     <!-- Header -->
-    <div class="p-6 pb-4 border-b border-gray-100 bg-gray-50/50">
+    <div class="p-6 pb-4 border-b border-sage-100 bg-sage-50/50">
       <div class="flex items-center space-x-3 mb-4">
-        <div class="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-200">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-          </svg>
+        <div class="w-10 h-10 flex items-center justify-center">
+          <img src="/icons/icon-32.png" alt="Domain Inspector+" class="w-10 h-10" />
         </div>
         <div>
-          <h1 class="text-lg font-bold text-gray-900 leading-tight">Domain Inspector+</h1>
-          <p class="text-xs text-gray-500 font-medium">Professional Domain Analysis</p>
+          <h1 class="text-lg font-bold text-sage-900 leading-tight">Domain Inspector+</h1>
+          <p class="text-xs text-sage-500 font-medium">Professional Domain Analysis</p>
         </div>
       </div>
 
@@ -146,7 +144,7 @@
           @keyup.enter="inspectDomain"
           type="text"
           placeholder="Enter domain (e.g. google.com)"
-          class="w-full pl-4 pr-12 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none shadow-sm"
+          class="w-full pl-4 pr-12 py-2.5 bg-white border border-sage-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none shadow-sm"
         />
         <button 
           @click="inspectDomain"
@@ -170,18 +168,18 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h3 class="font-semibold text-gray-800">Ready to Inspect</h3>
-        <p class="text-xs text-gray-500 mt-1 px-8">Enter a domain above or use context menu on any website to see instant details.</p>
+        <h3 class="font-semibold text-sage-800">Ready to Inspect</h3>
+        <p class="text-xs text-sage-500 mt-1 px-8">Enter a domain above or use context menu on any website to see instant details.</p>
       </div>
 
       <!-- Loading State -->
       <div v-if="loading" class="space-y-4">
-        <div class="h-20 bg-gray-50 rounded-xl animate-pulse"></div>
+        <div class="h-20 bg-sage-50 rounded-xl animate-pulse"></div>
         <div class="grid grid-cols-2 gap-4">
-          <div class="h-24 bg-gray-50 rounded-xl animate-pulse"></div>
-          <div class="h-24 bg-gray-50 rounded-xl animate-pulse"></div>
+          <div class="h-24 bg-sage-50 rounded-xl animate-pulse"></div>
+          <div class="h-24 bg-sage-50 rounded-xl animate-pulse"></div>
         </div>
-        <div class="h-32 bg-gray-50 rounded-xl animate-pulse"></div>
+        <div class="h-32 bg-sage-50 rounded-xl animate-pulse"></div>
       </div>
 
       <!-- Error State -->
@@ -200,7 +198,7 @@
       <!-- Result State -->
       <div v-if="domainInfo && !loading" class="space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Domain Details</h2>
+          <h2 class="text-sm font-bold text-sage-500 uppercase tracking-wider">Domain Details</h2>
           <button @click="copyAllInfo" class="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center">
             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -211,26 +209,26 @@
 
         <div class="space-y-3">
           <!-- Domain Card -->
-          <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+          <div class="p-4 bg-sage-50 rounded-xl border border-sage-100 flex items-center justify-between">
             <div>
-              <p class="text-[10px] font-bold text-gray-400 uppercase">Domain</p>
-              <p class="text-sm font-bold text-gray-900">{{ domainInfo.domain }}</p>
+              <p class="text-[10px] font-bold text-sage-400 uppercase">Domain</p>
+              <p class="text-sm font-bold text-sage-900">{{ domainInfo.domain }}</p>
             </div>
             <div class="text-right">
-              <p class="text-[10px] font-bold text-gray-400 uppercase">Created</p>
-              <p class="text-sm font-semibold text-gray-700">{{ formatDate(domainInfo.created) }}</p>
+              <p class="text-[10px] font-bold text-sage-400 uppercase">Created</p>
+              <p class="text-sm font-semibold text-sage-700">{{ formatDate(domainInfo.created) }}</p>
             </div>
           </div>
 
           <!-- Network Card -->
-          <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 grid grid-cols-2 gap-4">
+          <div class="p-4 bg-sage-50 rounded-xl border border-sage-100 grid grid-cols-2 gap-4">
             <div>
-              <p class="text-[10px] font-bold text-gray-400 uppercase">IP Address</p>
-              <p class="text-sm font-semibold text-gray-700 font-mono">{{ domainInfo.ip }}</p>
+              <p class="text-[10px] font-bold text-sage-400 uppercase">IP Address</p>
+              <p class="text-sm font-semibold text-sage-700 font-mono">{{ domainInfo.ip }}</p>
             </div>
             <div>
-              <p class="text-[10px] font-bold text-gray-400 uppercase">Country</p>
-              <p class="text-sm font-semibold text-gray-700">{{ getCountryName(domainInfo.country) }}</p>
+              <p class="text-[10px] font-bold text-sage-400 uppercase">Country</p>
+              <p class="text-sm font-semibold text-sage-700">{{ getCountryName(domainInfo.country) }}</p>
             </div>
           </div>
 
@@ -248,8 +246,8 @@
     </div>
 
     <!-- Footer -->
-    <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
-      <p class="text-[10px] text-gray-400 font-medium">Domain Inspector+ v{{ version }} • Powered by Vercel API</p>
+    <div class="p-4 bg-sage-50 border-t border-sage-100 text-center">
+      <p class="text-[10px] text-sage-400 font-medium">Domain Inspector+ v{{ version }} • Powered by Vercel API</p>
     </div>
   </div>
 </template>

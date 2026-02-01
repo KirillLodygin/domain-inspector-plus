@@ -272,8 +272,8 @@ function addStyles(): void {
   const style = document.createElement('style')
   style.textContent = `
     .highlight {
-      background-color: rgba(59, 130, 246, 0.1);
-      border-bottom: 2px solid #3b82f6;
+      background-color: rgba(34, 197, 94, 0.1);
+      border-bottom: 2px solid #22c55e;
       cursor: pointer;
       border-radius: 2px;
       padding: 0 1px;
@@ -281,7 +281,7 @@ function addStyles(): void {
     }
     
     .highlight:hover {
-      background-color: rgba(59, 130, 246, 0.2);
+      background-color: rgba(34, 197, 94, 0.2);
     }
     
     .${CONFIG.popupClass} {
@@ -291,7 +291,7 @@ function addStyles(): void {
     }
 
     .domain-tooltip {
-      background: #1f2937;
+      background: rgba(71, 135, 77, 0.85);
       color: white;
       border-radius: 6px;
       padding: 8px 12px;
@@ -303,6 +303,7 @@ function addStyles(): void {
       gap: 6px;
       animation: fadeIn 0.15s ease-out;
       position: relative;
+      backdrop-filter: blur(4px);
     }
 
     .domain-tooltip::after {
@@ -312,14 +313,14 @@ function addStyles(): void {
       left: 20px;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
-      border-top: 6px solid #1f2937;
+      border-top: 6px solid rgba(71, 135, 77, 0.85);
     }
 
     .tooltip-arrow-top::after {
       bottom: auto;
       top: -6px;
       border-top: none;
-      border-bottom: 6px solid #1f2937;
+      border-bottom: 6px solid rgba(71, 135, 77, 0.85);
     }
 
     .tooltip-content {
@@ -335,7 +336,7 @@ function addStyles(): void {
     }
     
     .inspect-btn {
-      background-color: #3b82f6;
+      background-color: #22c55e;
       color: white;
       border: none;
       border-radius: 4px;
@@ -347,7 +348,7 @@ function addStyles(): void {
     }
 
     .inspect-btn:hover {
-      background-color: #2563eb;
+      background-color: #16a34a;
     }
 
     @keyframes fadeIn {
