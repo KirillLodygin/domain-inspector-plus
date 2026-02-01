@@ -10,13 +10,10 @@
     "dev:chrome": "vite --mode chrome",
     "build:chrome": "vue-tsc --noEmit && vite build --mode chrome",
     "type-check": "vue-tsc --noEmit",
-
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-
     "lint": "eslint . --ext .vue,.js,.ts --fix",
     "lint:check": "eslint . --ext .vue,.js,.ts",
-
     "clean": "rm -rf dist",
     "clean:all": "rm -rf dist node_modules package-lock.json",
     "reinstall": "npm run clean:all && npm install"
@@ -30,6 +27,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.254",
     "@types/node": "^20.0.0",
+    "@types/webextension-polyfill": "^0.12.4",
     "@vitejs/plugin-vue": "^4.5.0",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^13.0.0",
@@ -40,10 +38,10 @@
     "postcss": "^8.4.32",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.3.6",
-    "typescript": "^5.3.0",
+    "typescript": "5.6.2",
     "vite": "^5.0.0",
     "vite-plugin-web-extension": "^4.0.0",
-    "vue-tsc": "^1.8.22"
+    "vue-tsc": "2.0.29"
   },
   "engines": {
     "node": ">=18.0.0"

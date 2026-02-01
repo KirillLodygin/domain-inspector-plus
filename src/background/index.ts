@@ -15,10 +15,10 @@ async function initialize(): Promise<void> {
 
   // Загружаем сохраненные настройки
   const result = await browser.storage.local.get(['isEnabled', 'apiEndpoint'])
-  state.isEnabled = result.isEnabled ?? true
+  state.isEnabled = (result as { isEnabled?: boolean }).isEnabled ?? true
 
   // Создаем контекстное меню
-  createContextMenu()
+  await createContextMenu()
 
   // Устанавливаем слушатели
   setupListeners()
@@ -29,13 +29,15 @@ async function initialize(): Promise<void> {
 /**
  * Создает контекстное меню
  */
-function createContextMenu(): void {
-  browser.contextMenus.removeAll(() => {
-    browser.contextMenus.create({
-      id: state.contextMenuId,
-      title: 'Inspect domain: %s',
-      contexts: ['selection', 'link'],
-    })
+async function createContextMenu(): Promise<void> {
+  // Удаляем все старые пункты меню
+  await browser.contextMenus.removeAll()
+
+  // Создаем новый пункт
+  browser.contextMenus.create({
+    id: state.contextMenuId,
+    title: 'Inspect domain: %s',
+    contexts: ['selection', 'link'],
   })
 }
 
@@ -47,7 +49,10 @@ function setupListeners(): void {
   browser.contextMenus.onClicked.addListener(handleContextMenuClick)
 
   // Сообщения от content script и popup
-  browser.runtime.onMessage.addListener(handleRuntimeMessage)
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    handleRuntimeMessage(message, sender, sendResponse)
+    return true // Возвращаем true для асинхронной обработки
+  })
 
   // Обновление вкладок
   browser.tabs.onUpdated.addListener(handleTabUpdate)
@@ -100,54 +105,60 @@ async function handleContextMenuClick(
 /**
  * Обработчик runtime сообщений
  */
-function handleRuntimeMessage(
+async function handleRuntimeMessage(
   message: any,
   sender: browser.Runtime.MessageSender,
   sendResponse: (response?: any) => void
-): boolean {
+): Promise<void> {
   console.log('Background received message:', message)
 
-  switch (message.type) {
-    case 'INSPECT_DOMAIN':
-      handleInspectDomain(message.domain, sender.tab?.id)
-      break
+  try {
+    switch (message.type) {
+      case 'INSPECT_DOMAIN':
+        await handleInspectDomain(message.domain, sender.tab?.id)
+        sendResponse({ success: true })
+        break
 
-    case 'GET_LAST_DOMAIN':
-      browser.storage.local.get('lastDomain').then((result: any) => {
+      case 'GET_LAST_DOMAIN':
+        const result = await browser.storage.local.get('lastDomain')
         sendResponse({ domain: result.lastDomain || '' })
-      })
-      return true
+        break
 
-    case 'TOGGLE_FEATURE':
-      state.isEnabled = message.enabled
-      browser.storage.local.set({ isEnabled: message.enabled })
+      case 'TOGGLE_FEATURE':
+        state.isEnabled = message.enabled
+        await browser.storage.local.set({ isEnabled: message.enabled })
 
-      // Отправляем обновление во все вкладки
-      browser.tabs.query({}).then((tabs: any[]) => {
-        tabs.forEach((tab: any) => {
+        // Отправляем обновление во все вкладки
+        const tabs = await browser.tabs.query({})
+        for (const tab of tabs) {
           if (tab.id) {
-            browser.tabs
-              .sendMessage(tab.id, {
+            try {
+              await browser.tabs.sendMessage(tab.id, {
                 type: 'TOGGLE_HIGHLIGHT',
                 enabled: message.enabled,
               })
-              .catch(() => {
-                // Игнорируем ошибки для вкладок без content script
-              })
+            } catch {
+              // Игнорируем ошибки для вкладок без content script
+            }
           }
+        }
+        sendResponse({ success: true })
+        break
+
+      case 'GET_STATE':
+        sendResponse({
+          isEnabled: state.isEnabled,
+          lastDomain: state.lastDomain,
         })
-      })
-      break
+        break
 
-    case 'GET_STATE':
-      sendResponse({
-        isEnabled: state.isEnabled,
-        lastDomain: state.lastDomain,
-      })
-      break
+      default:
+        sendResponse({ error: 'Unknown message type' })
+    }
+  } catch (error) {
+    console.error('Error handling message:', error)
+    sendResponse({ error: 'Failed to process message' })
   }
-
-  return true // Сообщаем, что sendResponse будет вызван асинхронно
 }
 
 /**

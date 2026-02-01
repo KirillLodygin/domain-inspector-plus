@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { ref, onMounted, computed, watch } from 'vue'
+  import browser from 'webextension-polyfill'
   import type { DomainInfo } from '@/lib/types'
   import { formatDate, getCountryName, formatNS, copyToClipboard } from '@/lib/utils'
   import { inspectDomain as apiInspectDomain } from '@/lib/api'
@@ -12,22 +13,31 @@
   const copyStatus = ref('')
 
   // Инициализация
-  onMounted(() => {
-    chrome.storage.local.get(['lastDomain'], result => {
+  onMounted(async () => {
+    try {
+      const result = await browser.storage.local.get(['lastDomain']) as { lastDomain?: string }
       if (result.lastDomain) {
         domainInput.value = result.lastDomain
-        chrome.storage.local.remove('lastDomain')
+        await inspectDomain()
+        await browser.storage.local.remove('lastDomain')
       }
-    })
+    } catch (error) {
+      console.error('Failed to get last domain:', error)
+    }
 
     // Listen for Escape key
     window.addEventListener('keydown', handleGlobalKeydown)
   })
 
-  // Watch domain property to trigger automatic requests
+  let inspectTimeout: number | null = null
   watch(domainInput, (newVal) => {
+    if (inspectTimeout) clearTimeout(inspectTimeout)
     if (newVal && isValidDomain(newVal)) {
-      inspectDomain()
+      inspectTimeout = window.setTimeout(() => {
+        if (domainInfo.value?.domain !== newVal) {
+          inspectDomain()
+        }
+      }, 500)
     }
   })
 
@@ -76,12 +86,9 @@
     const text = [
       `Domain: ${domainInfo.value.domain}`,
       `Created: ${formatDate(domainInfo.value.created)}`,
-      `Expires: ${formatDate(domainInfo.value.expires)}`,
-      `Registrar: ${domainInfo.value.registrar}`,
       `IP: ${domainInfo.value.ip}`,
       `Country: ${getCountryName(domainInfo.value.country)}`,
-      `ASN: ${domainInfo.value.asn}`,
-      `NS: ${nsText}`
+      `NS: ${domainInfo.value.ns.join(', ')}`
     ].join('\n')
 
     const success = await copyToClipboard(text)
@@ -192,72 +199,48 @@
 
       <!-- Result State -->
       <div v-if="domainInfo && !loading" class="space-y-4">
-        <!-- Success Header -->
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-base font-bold text-gray-800 flex items-center">
-            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-            Analysis Complete
-          </h2>
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Domain Details</h2>
           <button @click="copyAllInfo" class="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center">
             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
-            {{ copyStatus || 'Copy All Data' }}
+            {{ copyStatus || 'Copy All' }}
           </button>
         </div>
 
-        <!-- Cards -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Registration</p>
-            <div class="space-y-1">
-              <div class="flex justify-between text-xs">
-                <span class="text-gray-500">Created:</span>
-                <span class="font-semibold text-gray-700">{{ formatDate(domainInfo.created) }}</span>
-              </div>
-              <div class="flex justify-between text-xs">
-                <span class="text-gray-500">Expires:</span>
-                <span class="font-semibold text-gray-700">{{ formatDate(domainInfo.expires) }}</span>
-              </div>
+        <div class="space-y-3">
+          <!-- Domain Card -->
+          <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase">Domain</p>
+              <p class="text-sm font-bold text-gray-900">{{ domainInfo.domain }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] font-bold text-gray-400 uppercase">Created</p>
+              <p class="text-sm font-semibold text-gray-700">{{ formatDate(domainInfo.created) }}</p>
             </div>
           </div>
 
-          <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Network</p>
-            <div class="space-y-1">
-              <div class="flex justify-between text-xs">
-                <span class="text-gray-500">IP:</span>
-                <span class="font-semibold text-gray-700 font-mono">{{ domainInfo.ip }}</span>
-              </div>
-              <div class="flex justify-between text-xs">
-                <span class="text-gray-500">Region:</span>
-                <span class="font-semibold text-gray-700">{{ getCountryName(domainInfo.country) }}</span>
-              </div>
+          <!-- Network Card -->
+          <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase">IP Address</p>
+              <p class="text-sm font-semibold text-gray-700 font-mono">{{ domainInfo.ip }}</p>
+            </div>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase">Country</p>
+              <p class="text-sm font-semibold text-gray-700">{{ getCountryName(domainInfo.country) }}</p>
             </div>
           </div>
-        </div>
 
-        <div class="p-4 bg-primary-50/50 rounded-xl border border-primary-100">
-          <p class="text-[10px] font-bold text-primary-400 uppercase tracking-wider mb-2">Technical Details</p>
-          <div class="space-y-2">
-            <div>
-              <p class="text-[11px] text-primary-600 font-medium">Registrar</p>
-              <p class="text-sm font-semibold text-gray-800">{{ domainInfo.registrar }}</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-primary-600 font-medium">ASN</p>
-              <p class="text-sm font-semibold text-gray-800 font-mono">{{ domainInfo.asn }}</p>
-            </div>
-            <div>
-              <p class="text-[11px] text-primary-600 font-medium">DNS Servers</p>
-              <div class="flex flex-wrap gap-1.5 mt-1">
-                <span v-for="ns in formattedNS.primary" :key="ns" class="px-2 py-0.5 bg-white border border-primary-100 text-primary-700 text-[10px] font-mono rounded-md shadow-sm">
-                  {{ ns }}
-                </span>
-                <span v-if="formattedNS.othersCount > 0" class="text-[10px] text-gray-400 font-medium self-center ml-1">
-                  +{{ formattedNS.othersCount }} more
-                </span>
-              </div>
+          <!-- DNS Card -->
+          <div class="p-4 bg-primary-50 rounded-xl border border-primary-100">
+            <p class="text-[10px] font-bold text-primary-400 uppercase mb-2">Name Servers</p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="ns in domainInfo.ns" :key="ns" class="px-2 py-1 bg-white border border-primary-100 text-primary-700 text-[10px] font-mono rounded shadow-sm">
+                {{ ns }}
+              </span>
             </div>
           </div>
         </div>

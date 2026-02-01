@@ -4,7 +4,7 @@ import { inspectDomain } from '@/lib/api'
 
 // Конфигурация
 const CONFIG = {
-  highlightClass: 'domain-highlight',
+  highlightClass: 'highlight',
   popupClass: 'domain-inspector-popup',
   enabled: true,
 }
@@ -24,77 +24,67 @@ function debouncedHighlight(): void {
     clearTimeout(mutationTimeout)
   }
   mutationTimeout = window.setTimeout(() => {
-    const domainNodes = findDomainNodes()
-    domainNodes.forEach(({ node, domain }) => {
-      highlightDomain(node, domain)
-    })
+    findDomainNodes()
     mutationTimeout = null
   }, 500)
 }
-function findDomainNodes(): { node: Node; domain: string }[] {
-  const results: { node: Node; domain: string }[] = []
+function findDomainNodes(): void {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null)
-  const domainRegex = /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/gi;
+  const domainRegex = /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi;
 
+  const nodesToProcess: Node[] = []
   let node: Node | null
   while ((node = walker.nextNode())) {
-    if (node.textContent && node.parentNode && !(node.parentNode as HTMLElement).closest(`.${CONFIG.highlightClass}`)) {
-      const text = node.textContent
-      if (domainRegex.test(text)) {
-        const match = text.match(domainRegex);
-        if (match) {
-          results.push({ node, domain: extractDomain(match[0]) || '' })
-        }
-      }
+    const text = node.textContent
+    if (!text || text.length < 4) continue
+    
+    const parent = node.parentNode as HTMLElement
+    if (!parent || parent.closest(`.${CONFIG.highlightClass}`) || 
+        ['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT'].includes(parent.tagName) ||
+        parent.isContentEditable) {
+      continue
     }
+
+    nodesToProcess.push(node)
   }
 
-  return results
+  nodesToProcess.forEach(node => highlightInNode(node, domainRegex))
 }
 
-/**
- * Подсвечивает домен в текстовом узле
- */
-function highlightDomain(node: Node, domain: string): void {
-  if (!node.parentNode || node.nodeType !== Node.TEXT_NODE) return
+function highlightInNode(node: Node, regex: RegExp): void {
+  const text = node.textContent
+  if (!text || !node.parentNode) return
 
-  const text = node.textContent || ''
-  const regex = new RegExp(
-    `((?:https?:\\/\\/)?(?:www\\.)?${domain.replace('.', '\\.')}(?![\\w-]))`,
-    'gi'
-  )
-
+  regex.lastIndex = 0
   if (!regex.test(text)) return
 
   const fragment = document.createDocumentFragment()
   let lastIndex = 0
   let match
 
-  regex.lastIndex = 0 // Reset regex
+  regex.lastIndex = 0
   while ((match = regex.exec(text)) !== null) {
-    // Текст до совпадения
+    // Text before match
     if (match.index > lastIndex) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
     }
 
-    // Подсвеченный домен
+    const domain = match[0]
     const span = document.createElement('span')
     span.className = CONFIG.highlightClass
-    span.dataset.domain = domain
-    span.dataset.originalText = match[0]
-    span.textContent = match[0]
+    span.dataset.domain = domain.toLowerCase()
+    span.dataset.originalText = domain
+    span.textContent = domain
 
-    // Добавляем обработчики событий
     span.addEventListener('mouseenter', handleDomainHover)
     span.addEventListener('mouseleave', handleDomainLeave)
-    span.addEventListener('click', (e) => handleDomainClick(e, domain))
+    span.addEventListener('click', (e) => handleDomainClick(e, domain.toLowerCase()))
 
     fragment.appendChild(span)
     highlightedElements.push(span)
     lastIndex = regex.lastIndex
   }
 
-  // Оставшийся текст
   if (lastIndex < text.length) {
     fragment.appendChild(document.createTextNode(text.slice(lastIndex)))
   }
@@ -251,10 +241,7 @@ function initHighlighting(): void {
   if (!CONFIG.enabled) return
 
   // Находим и подсвечиваем все домены
-  const domainNodes = findDomainNodes()
-  domainNodes.forEach(({ node, domain }) => {
-    highlightDomain(node, domain)
-  })
+  findDomainNodes()
 
   // Наблюдаем за изменениями DOM
   observer = new MutationObserver(mutations => {
@@ -281,30 +268,10 @@ function initHighlighting(): void {
   addStyles()
 }
 
-/**
- * Обрабатывает элемент рекурсивно
- */
-function processElement(element: HTMLElement): void {
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null)
-
-  let node: Node | null
-  while ((node = walker.nextNode())) {
-    if (node.textContent) {
-      const domain = extractDomain(node.textContent)
-      if (domain && isValidDomain(domain)) {
-        highlightDomain(node, domain)
-      }
-    }
-  }
-}
-
-/**
- * Добавляет CSS стили
- */
 function addStyles(): void {
   const style = document.createElement('style')
   style.textContent = `
-    .${CONFIG.highlightClass} {
+    .highlight {
       background-color: rgba(59, 130, 246, 0.1);
       border-bottom: 2px solid #3b82f6;
       cursor: pointer;
@@ -313,7 +280,7 @@ function addStyles(): void {
       transition: background-color 0.2s;
     }
     
-    .${CONFIG.highlightClass}:hover {
+    .highlight:hover {
       background-color: rgba(59, 130, 246, 0.2);
     }
     

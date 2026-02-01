@@ -1,8 +1,16 @@
-import type { ApiResponse } from './types';
+import type { ApiResponse, DomainInfo } from './types';
 import { config } from './config';
 
 export async function inspectDomain(domain: string): Promise<ApiResponse> {
-  const url = `${config.apiBaseUrl}/api/inspect?domain=${encodeURIComponent(domain)}`;
+  // === ТЕСТОВЫЙ API (ЗАГЛУШКА) ===
+  // Для тестирования используем всегда google.com как рабочий домен
+  // TODO: Убрать эту заглушку при подключении реального API
+  const testDomain = 'google.com';
+  const url = `https://domain-inspector-backend.vercel.app/api/inspect?domain=${encodeURIComponent(testDomain)}`;
+  
+  // === РЕАЛЬНЫЙ API (ЗАКОММЕНТИРОВАНО) ===
+  // TODO: Раскомментировать для реального API
+  // const url = `${config.apiBaseUrl}/api/inspect?domain=${encodeURIComponent(domain)}`;
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config.apiTimeout);
@@ -27,8 +35,26 @@ export async function inspectDomain(domain: string): Promise<ApiResponse> {
       throw new Error(`API error: ${response.status}`);
     }
     
-    const data = await response.json();
-    return data as ApiResponse;
+    const rawData = await response.json();
+    
+    // === ТЕСТОВЫЙ API (АДАПТАЦИЯ ОТВЕТА) ===
+    // Тестовый API возвращает прямые данные, оборачиваем в ApiResponse
+    // TODO: Убрать эту адаптацию при реальном API (если он возвращает ApiResponse)
+    const apiResponse: ApiResponse = {
+      success: true,
+      data: {
+        ...rawData,
+        domain: domain // Подменяем домен на запрошенный
+      } as DomainInfo,
+      cached: rawData.cached
+    };
+    
+    return apiResponse;
+    
+    // === РЕАЛЬНЫЙ API (ЕСЛИ ВОЗВРАЩАЕТ ApiResponse) ===
+    // TODO: Раскомментировать для реального API
+    // return rawData as ApiResponse;
+    
   } catch (error) {
     clearTimeout(timeoutId);
     config.error('Failed to inspect domain:', error);
