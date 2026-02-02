@@ -110,11 +110,12 @@ async function handleRuntimeMessage(
   sender: browser.Runtime.MessageSender,
   sendResponse: (response?: any) => void
 ): Promise<void> {
-  console.log('Background received message:', message)
+  console.log('Background received message:', message, 'from tab:', sender.tab?.id)
 
   try {
     switch (message.type) {
       case 'INSPECT_DOMAIN':
+        console.log('Background: Processing INSPECT_DOMAIN for:', message.domain)
         await handleInspectDomain(message.domain, sender.tab?.id)
         sendResponse({ success: true })
         break
@@ -153,6 +154,7 @@ async function handleRuntimeMessage(
         break
 
       default:
+        console.warn('Background: Unknown message type:', message.type)
         sendResponse({ error: 'Unknown message type' })
     }
   } catch (error) {
@@ -195,15 +197,29 @@ async function handleInspectDomain(domain: string, tabId?: number): Promise<void
 
   // Открываем popup
   try {
-    await (browser.action as any).openPopup()
+    // Пробуем стандартный метод
+    await browser.action.openPopup()
   } catch (error) {
-    console.warn('Could not open popup automatically, showing notification')
-    browser.notifications.create({
-      type: 'basic',
-      iconUrl: browser.runtime.getURL('icons/icon-48.png'),
-      title: 'Domain Inspector+',
-      message: `Domain ${domain} is ready for inspection. Click the extension icon.`,
-    })
+    console.warn('Could not open popup with standard method:', error)
+    
+    // Альтернативный метод через chrome (если доступен)
+    try {
+      if ((chrome as any).action?.openPopup) {
+        await (chrome as any).action.openPopup()
+      } else {
+        throw new Error('No popup opening method available')
+      }
+    } catch (chromeError) {
+      console.warn('Could not open popup with chrome method:', chromeError)
+      
+      // Показываем уведомление как фоллбэк
+      browser.notifications.create({
+        type: 'basic',
+        iconUrl: browser.runtime.getURL('icons/icon-48.png'),
+        title: 'Domain Inspector+',
+        message: `Domain ${domain} is ready for inspection. Click the extension icon.`,
+      })
+    }
   }
 }
 

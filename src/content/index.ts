@@ -134,7 +134,12 @@ function handleDomainClick(event: Event, domainOverride?: string): void {
   const target = event.currentTarget as HTMLElement
   const domain = domainOverride || target.dataset.domain
 
-  if (!domain) return
+  if (!domain) {
+    console.error('No domain found for click')
+    return
+  }
+
+  console.log('Content script: Sending INSPECT_DOMAIN message for:', domain)
 
   // Отправляем сообщение в background script
   browser.runtime
@@ -143,8 +148,11 @@ function handleDomainClick(event: Event, domainOverride?: string): void {
       domain,
       source: 'click',
     })
-    .catch(() => {
-      // Игнорируем ошибки, если расширение не готово
+    .then((response) => {
+      console.log('Content script: Message response:', response)
+    })
+    .catch((error) => {
+      console.error('Content script: Failed to send message:', error)
     })
 }
 
