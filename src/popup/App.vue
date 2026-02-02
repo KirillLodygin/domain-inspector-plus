@@ -129,7 +129,7 @@
     <div class="p-6 pb-4 border-b border-sage-100 bg-sage-50/50">
       <div class="flex items-center space-x-3 mb-4">
         <div class="w-10 h-10 flex items-center justify-center">
-          <img src="/icons/icon-32.png" alt="Domain Inspector+" class="w-10 h-10" />
+          <img src="/icons/icon-48.png" alt="Domain Inspector+" class="w-10 h-10" />
         </div>
         <div>
           <h1 class="text-lg font-bold text-sage-900 leading-tight">Domain Inspector+</h1>
