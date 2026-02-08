@@ -22,6 +22,65 @@ let targetElement: HTMLElement | null = null
 /**
  * Дебаунс для обработки изменений DOM
  */
+/**
+ * Показывает индикатор отключения на ограниченных сайтах
+ */
+function showDisabledIndicator(hostname: string): void {
+  // Проверяем, не показан ли уже индикатор
+  if (document.querySelector('#domain-inspector-disabled-indicator')) {
+    return
+  }
+
+  const indicator = document.createElement('div')
+  indicator.id = 'domain-inspector-disabled-indicator'
+  indicator.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #fbbf24;
+    color: #78350f;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 10000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: opacity 0.3s ease;
+    cursor: pointer;
+  `
+  indicator.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span>🔍</span>
+      <span>Domain Inspector disabled on ${hostname}</span>
+    </div>
+  `
+
+  // Добавляем обработчик для закрытия
+  indicator.addEventListener('click', () => {
+    indicator.style.opacity = '0'
+    setTimeout(() => {
+      if (indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator)
+      }
+    }, 300)
+  })
+
+  document.body.appendChild(indicator)
+
+  // Автоматически скрываем через 5 секунд
+  setTimeout(() => {
+    if (indicator.parentNode) {
+      indicator.style.opacity = '0'
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator)
+        }
+      }, 300)
+    }
+  }, 5000)
+}
+
 function debouncedHighlight(): void {
   if (mutationTimeout) {
     clearTimeout(mutationTimeout)
@@ -32,6 +91,26 @@ function debouncedHighlight(): void {
   }, 500)
 }
 function findDomainNodes(): void {
+  // Полное отключение на code-хостингах и других проблемных сайтах
+  const restrictedSites = [
+    'github.com', 'gitlab.com', 'bitbucket.org', 'git.sr.ht',
+    'sourceforge.net', 'codeberg.org', 'gitea.io', 'gogs.io',
+    'stackoverflow.com', 'serverfault.com', 'superuser.com',
+    'reddit.com', 'discord.com', 'slack.com', 'twitter.com',
+    'x.com', 'facebook.com', 'linkedin.com', 'instagram.com'
+  ]
+
+  const currentHost = window.location.hostname
+  const isRestrictedSite = restrictedSites.some(site => 
+    currentHost === site || currentHost.endsWith('.' + site)
+  )
+
+  if (isRestrictedSite) {
+    // Показываем индикатор, что расширение отключено
+    showDisabledIndicator(currentHost)
+    return // Полностью отключаем подсветку на этих сайтах
+  }
+
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null)
   // Регулярное выражение для доменов
   const domainRegex = /\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?\b/gi
@@ -56,58 +135,16 @@ function findDomainNodes(): void {
       continue
     }
 
-    // Проверяем, что текст не является частью ссылки - НО теперь мы будем обрабатывать ссылки отдельно
-    const isInsideLink = parent.tagName === 'A' || parent.closest('a')
-    
     // Простая проверка на файлы - исключаем только очевидные файлы
     const trimmedText = text.trim()
     const fileExtensions = [
-      'js',
-      'json',
-      'ts',
-      'tsx',
-      'jsx',
-      'css',
-      'scss',
-      'html',
-      'md',
-      'txt',
-      'sh',
-      'py',
-      'java',
-      'cpp',
-      'c',
-      'go',
-      'rs',
-      'php',
-      'rb',
-      'swift',
-      'kt',
-      'scala',
-      'clj',
-      'hs',
-      'ml',
-      'elm',
-      'dart',
-      'lua',
-      'r',
-      'sql',
-      'graphql',
-      'yaml',
-      'yml',
-      'toml',
-      'ini',
-      'cfg',
-      'conf',
-      'xml',
-      'csv',
-      'log',
-      'tmp',
-      'bak',
-      'old',
-      'orig',
-      'swp',
-      'swo',
+      'js', 'json', 'ts', 'tsx', 'jsx', 'css', 'scss',
+      'html', 'md', 'txt', 'sh', 'py', 'java', 'cpp',
+      'c', 'go', 'rs', 'php', 'rb', 'swift', 'kt',
+      'scala', 'clj', 'hs', 'ml', 'elm', 'dart',
+      'lua', 'r', 'sql', 'graphql', 'yaml', 'yml',
+      'toml', 'ini', 'cfg', 'conf', 'xml', 'csv',
+      'log', 'tmp', 'bak', 'old', 'orig', 'swp', 'swo',
     ]
 
     // Проверяем, что это именно файл с расширением, а не домен
