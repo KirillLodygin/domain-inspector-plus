@@ -14,6 +14,7 @@ let observer: MutationObserver | null = null
 let highlightedElements: HTMLElement[] = []
 let activePopup: HTMLElement | null = null
 let hideTimeout: number | null = null
+let hoverTimeout: number | null = null
 let mutationTimeout: number | null = null
 let scrollListener: ((event: Event) => void) | null = null
 let targetElement: HTMLElement | null = null
@@ -32,24 +33,104 @@ function debouncedHighlight(): void {
 }
 function findDomainNodes(): void {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null)
-  const domainRegex = /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi;
+  // Регулярное выражение для доменов
+  const domainRegex = /\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?\b/gi
 
   const nodesToProcess: Node[] = []
   let node: Node | null
+  let totalNodes = 0
+  let skippedNodes = 0
+  let processedNodes = 0
+
   while ((node = walker.nextNode())) {
+    totalNodes++
     const text = node.textContent
-    if (!text || text.length < 4) continue
-    
-    const parent = node.parentNode as HTMLElement
-    if (!parent || parent.closest(`.${CONFIG.highlightClass}`) || 
-        ['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT'].includes(parent.tagName) ||
-        parent.isContentEditable) {
+    if (!text || text.length < 4) {
+      skippedNodes++
       continue
     }
 
-    nodesToProcess.push(node)
-  }
+    const parent = node.parentNode as HTMLElement
+    if (!parent || parent.closest(`.${CONFIG.highlightClass}`) || ['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT'].includes(parent.tagName) || parent.isContentEditable) {
+      skippedNodes++
+      continue
+    }
 
+    // Проверяем, что текст не является частью ссылки - НО теперь мы будем обрабатывать ссылки отдельно
+    const isInsideLink = parent.tagName === 'A' || parent.closest('a')
+    
+    // Простая проверка на файлы - исключаем только очевидные файлы
+    const trimmedText = text.trim()
+    const fileExtensions = [
+      'js',
+      'json',
+      'ts',
+      'tsx',
+      'jsx',
+      'css',
+      'scss',
+      'html',
+      'md',
+      'txt',
+      'sh',
+      'py',
+      'java',
+      'cpp',
+      'c',
+      'go',
+      'rs',
+      'php',
+      'rb',
+      'swift',
+      'kt',
+      'scala',
+      'clj',
+      'hs',
+      'ml',
+      'elm',
+      'dart',
+      'lua',
+      'r',
+      'sql',
+      'graphql',
+      'yaml',
+      'yml',
+      'toml',
+      'ini',
+      'cfg',
+      'conf',
+      'xml',
+      'csv',
+      'log',
+      'tmp',
+      'bak',
+      'old',
+      'orig',
+      'swp',
+      'swo',
+    ]
+
+    // Проверяем, что это именно файл с расширением, а не домен
+    const isFile = fileExtensions.some(ext => {
+      const filePattern = new RegExp(`\\.${ext}$`, 'i')
+      return filePattern.test(trimmedText) && !/\.[a-z]{2,}(?:\.[a-z]{2,})?\b/i.test(trimmedText)
+    })
+
+    if (isFile) {
+      skippedNodes++
+      continue
+    }
+
+    // Проверяем, содержит ли текст домены
+    if (domainRegex.test(text)) {
+      // Теперь подсвечиваем домены даже в ссылках
+      nodesToProcess.push(node)
+      processedNodes++
+    } else {
+      skippedNodes++
+    }
+  }
+  
   nodesToProcess.forEach(node => highlightInNode(node, domainRegex))
 }
 
@@ -58,15 +139,19 @@ function highlightInNode(node: Node, regex: RegExp): void {
   if (!text || !node.parentNode) return
 
   regex.lastIndex = 0
-  if (!regex.test(text)) return
+  if (!regex.test(text)) {
+    return
+  }
 
   const fragment = document.createDocumentFragment()
   let lastIndex = 0
-  let match
+  let domainsFound = 0
 
   regex.lastIndex = 0
+  let match
+
   while ((match = regex.exec(text)) !== null) {
-    // Text before match
+    // Добавляем текст до домена
     if (match.index > lastIndex) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)))
     }
@@ -74,74 +159,120 @@ function highlightInNode(node: Node, regex: RegExp): void {
     const domain = match[0]
     const span = document.createElement('span')
     span.className = CONFIG.highlightClass
-    span.dataset.domain = domain.toLowerCase()
+    span.style.cssText = `
+      background-color: rgba(34, 197, 94, 0.1);
+      color: #16a34a;
+      border-radius: 3px;
+      padding: 1px 3px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: underline;
+      text-decoration-color: rgba(34, 197, 94, 0.3);
+      text-underline-offset: 2px;
+    `
     span.dataset.originalText = domain
+    span.dataset.domain = domain // Важно: добавляем domain в dataset!
     span.textContent = domain
 
     span.addEventListener('mouseenter', handleDomainHover)
     span.addEventListener('mouseleave', handleDomainLeave)
-    span.addEventListener('click', (e) => handleDomainClick(e, domain.toLowerCase()))
+    span.addEventListener('click', e => handleDomainClick(e, domain.toLowerCase()))
 
     fragment.appendChild(span)
     highlightedElements.push(span)
+
+    domainsFound++
     lastIndex = regex.lastIndex
   }
 
+  // Добавляем оставшийся текст
   if (lastIndex < text.length) {
     fragment.appendChild(document.createTextNode(text.slice(lastIndex)))
   }
 
-  node.parentNode.replaceChild(fragment, node)
+  // Заменяем оригинальный узел
+  const parent = node.parentNode
+  if (parent) {
+    parent.replaceChild(fragment, node)
+  }
 }
 
 /**
- * Обработчик наведения на домен
+ * Обработчики событий для доменов
  */
 function handleDomainHover(event: Event): void {
+  const target = event.target as HTMLElement
+  const domain = target.dataset.domain
+
+  if (!domain) {
+    return
+  }
+
+  // Очищаем предыдущие таймауты
   if (hideTimeout) {
     clearTimeout(hideTimeout)
     hideTimeout = null
   }
 
-  const target = event.currentTarget as HTMLElement
-  const domain = target.dataset.domain
-
-  if (!domain) return
-
-  // Показываем всплывающую подсказку
-  showTooltip(target, domain)
+  // Уменьшаем задержку показа tooltip
+  hoverTimeout = window.setTimeout(() => {
+    showTooltip(target, domain)
+  }, 100)
 }
 
-/**
- * Обработчик ухода мыши с домена
- */
-function handleDomainLeave(event: MouseEvent): void {
-  const relatedTarget = event.relatedTarget as HTMLElement;
-  if (relatedTarget && relatedTarget.closest(`.${CONFIG.popupClass}`)) {
-    return;
+function handleDomainLeave(event: Event): void {
+  // Очищаем таймаут показа
+  if (hoverTimeout) {
+    clearTimeout(hoverTimeout)
+    hoverTimeout = null
   }
 
+  // Скрываем tooltip с задержкой
   hideTimeout = window.setTimeout(() => {
     hideTooltip()
-  }, 300)
+  }, 100)
 }
 
 /**
  * Обработчик клика по домену
  */
 function handleDomainClick(event: Event, domainOverride?: string): void {
-  event.preventDefault()
-  event.stopPropagation()
+  // Проверяем модификаторы клика
+  const mouseEvent = event as MouseEvent
 
-  const target = event.currentTarget as HTMLElement
-  const domain = domainOverride || target.dataset.domain
-
-  if (!domain) {
-    console.error('No domain found for click')
+  // Если клик с модификаторами (Ctrl, Cmd, Shift, Alt), не обрабатываем
+  if (mouseEvent.ctrlKey || mouseEvent.metaKey || mouseEvent.shiftKey || mouseEvent.altKey) {
     return
   }
 
-  console.log('Content script: Sending INSPECT_DOMAIN message for:', domain)
+  // Если это правый клик или средний клик, не обрабатываем
+  if (mouseEvent.button !== 0) {
+    return
+  }
+
+  const target = event.target as HTMLElement
+  const domain = domainOverride || target.dataset.domain
+
+  if (!domain) {
+    return
+  }
+
+  // Если клик по tooltip - уже обработано в отдельном обработчике
+  if (target.closest('.domain-inspector-popup')) {
+    return
+  }
+
+  // Проверяем, кликнута ли ссылка
+  const isLinkClick = target.tagName === 'A' || target.closest('a')
+  
+  if (isLinkClick) {
+    // Для ссылок - не блокируем переход, не открываем popup
+    return
+  }
+
+  // Для обычных доменов (не в ссылках) - стандартная обработка
+  event.preventDefault()
+  event.stopPropagation()
 
   // Отправляем сообщение в background script
   browser.runtime
@@ -150,10 +281,10 @@ function handleDomainClick(event: Event, domainOverride?: string): void {
       domain,
       source: 'click',
     })
-    .then((response) => {
-      console.log('Content script: Message response:', response)
+    .then(response => {
+      // Response handling
     })
-    .catch((error) => {
+    .catch(error => {
       console.error('Content script: Failed to send message:', error)
     })
 }
@@ -163,14 +294,90 @@ function handleDomainClick(event: Event, domainOverride?: string): void {
  */
 async function showTooltip(element: HTMLElement, domain: string): Promise<void> {
   if (activePopup) {
-    if (activePopup.dataset.domain === domain) return
+    if (activePopup.dataset.domain === domain) {
+      return
+    }
     hideTooltip()
   }
 
-  // Сохраняем ссылку на элемент
   targetElement = element
 
   const rect = element.getBoundingClientRect()
+
+  // Проверяем и добавляем CSS стили если нужно
+  if (!document.querySelector('#domain-inspector-tooltip-styles')) {
+    const style = document.createElement('style')
+    style.id = 'domain-inspector-tooltip-styles'
+    style.textContent = `
+      .${CONFIG.popupClass} {
+        position: absolute;
+        z-index: 10000;
+        background: #16a34a;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      
+      .${CONFIG.popupClass}:hover {
+        background: #15803d;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      }
+      
+      .${CONFIG.popupClass} .inspect-btn {
+        background: transparent;
+        color: white;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      
+      .tooltip-arrow {
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+      }
+      
+      .${CONFIG.popupClass}.arrow-top .tooltip-arrow {
+        top: -5px;
+        left: 10px; /* Смещаем вправо для нижнего позиционирования */
+        transform: none;
+        border-bottom: 5px solid #16a34a;
+      }
+      
+      .${CONFIG.popupClass}.arrow-bottom .tooltip-arrow {
+        bottom: -5px;
+        right: 10px; /* Смещаем вправо для верхнего позиционирования */
+        transform: none;
+        border-top: 5px solid #16a34a;
+      }
+      
+      /* Добавляем невидимую буферную зону вокруг tooltip */
+      .${CONFIG.popupClass}::before {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        z-index: -1;
+      }
+    `
+    document.head.appendChild(style)
+  }
+
   const popup = document.createElement('div')
   popup.className = CONFIG.popupClass
   popup.dataset.domain = domain
@@ -185,12 +392,14 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
   popup.addEventListener('mouseleave', () => {
     hideTimeout = window.setTimeout(() => {
       hideTooltip()
-    }, 300)
+    }, 200)
   })
 
   // Функция обновления позиции
   const updatePosition = () => {
-    if (!popup.parentNode || !targetElement) return
+    if (!popup || !targetElement) {
+      return
+    }
 
     const currentRect = targetElement.getBoundingClientRect()
     const popupWidth = 240
@@ -198,45 +407,47 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft
 
-    // Вычисляем позицию с учетом скролла
-    let left = currentRect.left + scrollLeft
-    let top = currentRect.top + scrollTop - popupHeight - 10
-    let arrowClass = ''
+    // Начальная позиция - под элементом с отступом
+    let left = currentRect.left + scrollLeft + 10 // Смещаем вправо
+    let top = currentRect.bottom + scrollTop + 8 // Увеличиваем отступ снизу
+    let arrowClass = 'arrow-top'
 
-    // Проверка границ экрана
+    // Проверяем, не выходит ли tooltip за пределы экрана
     if (left + popupWidth > window.innerWidth) {
       left = window.innerWidth - popupWidth - 20
     }
-    
-    if (top < scrollTop) {
-      top = currentRect.top + scrollTop + currentRect.height + 10
-      arrowClass = 'tooltip-arrow-top'
+
+    if (top + popupHeight > window.innerHeight) {
+      // Если не помещается внизу, показываем сверху с минимальным отступом
+      top = currentRect.top + scrollTop - popupHeight + 2 // Минимальный отступ сверху
+      left = currentRect.left + scrollLeft - 10 // Смещаем влево
+      arrowClass = 'arrow-bottom'
+      
+      // Дополнительная проверка для верхнего позиционирования
+      if (left < 0) {
+        left = 10 // Минимальный отступ слева
+      }
     }
 
     popup.style.position = 'absolute'
     popup.style.left = `${left}px`
     popup.style.top = `${top}px`
+    popup.style.zIndex = '10000'
 
     // Обновляем класс стрелки
-    const tooltip = popup.querySelector('.domain-tooltip') as HTMLElement
-    if (tooltip) {
-      tooltip.className = `domain-tooltip ${arrowClass}`
-    }
+    popup.className = `${CONFIG.popupClass} ${arrowClass}`
   }
 
-  // Начальное состояние
+  // Начальное состояние - только кнопка Inspect
   popup.innerHTML = `
-    <div class="domain-tooltip">
-      <div class="tooltip-content">
-        <div class="domain-name">${domain}</div>
-        <button class="inspect-btn">Inspect</button>
-      </div>
-    </div>
+    <button class="inspect-btn">Inspect</button>
+    <div class="tooltip-arrow"></div>
   `
 
-  // Добавляем в DOM ПЕРЕД позиционированием
+  // Добавляем popup в DOM
   document.body.appendChild(popup)
   activePopup = popup
+  targetElement = element
 
   // Начальное позиционирование ПОСЛЕ добавления в DOM
   updatePosition()
@@ -248,11 +459,25 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
   window.addEventListener('scroll', scrollListener, { passive: true })
   window.addEventListener('resize', scrollListener, { passive: true })
 
-  // Обработчик кнопки инспекции
-  const inspectBtn = popup.querySelector('.inspect-btn')
-  inspectBtn?.addEventListener('click', (e) => {
+  // Обработчик кнопки инспекции - теперь сам popup является кнопкой
+  popup.addEventListener('click', e => {
     e.stopPropagation()
-    handleDomainClick(e, domain)
+    e.preventDefault()
+    
+    // Отправляем сообщение в background script для открытия popup
+    browser.runtime
+      .sendMessage({
+        type: 'INSPECT_DOMAIN',
+        domain,
+        source: 'tooltip',
+      })
+      .then(response => {
+        // Response handling
+      })
+      .catch(error => {
+        console.error('Content script: Failed to send tooltip message:', error)
+      })
+    
     hideTooltip()
   })
 }
@@ -265,17 +490,17 @@ function hideTooltip(): void {
     clearTimeout(hideTimeout)
     hideTimeout = null
   }
-  
+
   // Удаляем слушатели скролла
   if (scrollListener) {
     window.removeEventListener('scroll', scrollListener)
     window.removeEventListener('resize', scrollListener)
     scrollListener = null
   }
-  
+
   // Сбрасываем ссылку на элемент
   targetElement = null
-  
+
   if (activePopup && activePopup.parentNode) {
     activePopup.parentNode.removeChild(activePopup)
     activePopup = null
@@ -409,24 +634,37 @@ function addStyles(): void {
 }
 
 /**
- * Очищает все подсветки
+ * Очистка подсветки
  */
 function cleanup(): void {
-  highlightedElements.forEach(element => {
-    if (element.parentNode && element.dataset.originalText) {
-      const textNode = document.createTextNode(element.dataset.originalText)
-      element.parentNode.replaceChild(textNode, element)
-    }
-  })
-
-  highlightedElements = []
-
+  // Очищаем observer
   if (observer) {
     observer.disconnect()
     observer = null
   }
 
+  // Удаляем подсветку
+  highlightedElements.forEach(el => {
+    const parent = el.parentNode
+    if (parent && el.dataset.originalText) {
+      parent.replaceChild(document.createTextNode(el.dataset.originalText), el)
+    }
+  })
+  highlightedElements = []
+
+  // Скрываем tooltip
   hideTooltip()
+
+  // Очищаем все таймауты
+  if (mutationTimeout) {
+    clearTimeout(mutationTimeout)
+    mutationTimeout = null
+  }
+
+  if (hoverTimeout) {
+    clearTimeout(hoverTimeout)
+    hoverTimeout = null
+  }
 }
 
 /**

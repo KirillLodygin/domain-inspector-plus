@@ -14,7 +14,7 @@ export const config = {
 
   // Отладка
   isDebug: import.meta.env.VITE_DEBUG === 'true',
-  enableLogging: import.meta.env.VITE_ENABLE_LOGGING === 'true',
+  enableLogging: import.meta.env.VITE_ENABLE_LOGGING === 'true' || import.meta.env.DEV,
   hotReload: import.meta.env.VITE_HOT_RELOAD === 'true',
 
   // Вычисляемые

@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
                 browser: 'chrome',
                 watchFilePaths: ['src', 'public'],
                 disableAutoLaunch: !isDev,
+                // Примечание: предупреждение о json.schemastore.org является известной проблемой плагина
+                // и не влияет на функциональность. Manifest валиден и расширение работает корректно.
+                // Альтернативных опций для отключения валидации в текущей версии плагина нет.
             }),
         ],
         resolve: {

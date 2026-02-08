@@ -11,8 +11,6 @@ const state = {
  * Инициализация расширения
  */
 async function initialize(): Promise<void> {
-  console.log('Domain Inspector Plus initializing...')
-
   // Загружаем сохраненные настройки
   const result = await browser.storage.local.get(['isEnabled', 'apiEndpoint'])
   state.isEnabled = (result as { isEnabled?: boolean }).isEnabled ?? true
@@ -22,8 +20,6 @@ async function initialize(): Promise<void> {
 
   // Устанавливаем слушатели
   setupListeners()
-
-  console.log('Domain Inspector Plus initialized')
 }
 
 /**
@@ -110,12 +106,9 @@ async function handleRuntimeMessage(
   sender: browser.Runtime.MessageSender,
   sendResponse: (response?: any) => void
 ): Promise<void> {
-  console.log('Background received message:', message, 'from tab:', sender.tab?.id)
-
   try {
     switch (message.type) {
       case 'INSPECT_DOMAIN':
-        console.log('Background: Processing INSPECT_DOMAIN for:', message.domain)
         await handleInspectDomain(message.domain, sender.tab?.id)
         sendResponse({ success: true })
         break
@@ -138,7 +131,7 @@ async function handleRuntimeMessage(
                 type: 'TOGGLE_HIGHLIGHT',
                 enabled: message.enabled,
               })
-            } catch {
+            } catch (error) {
               // Игнорируем ошибки для вкладок без content script
             }
           }
@@ -154,12 +147,11 @@ async function handleRuntimeMessage(
         break
 
       default:
-        console.warn('Background: Unknown message type:', message.type)
         sendResponse({ error: 'Unknown message type' })
     }
   } catch (error) {
     console.error('Error handling message:', error)
-    sendResponse({ error: 'Failed to process message' })
+    sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' })
   }
 }
 
@@ -167,8 +159,6 @@ async function handleRuntimeMessage(
  * Обработчик запроса на инспекцию домена
  */
 async function handleInspectDomain(domain: string, tabId?: number): Promise<void> {
-  console.log('Inspecting domain:', domain)
-
   state.lastDomain = domain
   await browser.storage.local.set({ lastDomain: domain })
 
@@ -179,19 +169,9 @@ async function handleInspectDomain(domain: string, tabId?: number): Promise<void
       tabId,
     })
 
-    await browser.action.setBadgeBackgroundColor({
-      color: '#10B981',
-      tabId,
-    })
-
     // Сбрасываем badge через 3 секунды
     setTimeout(() => {
-      browser.action
-        .setBadgeText({
-          text: '',
-          tabId,
-        })
-        .catch(() => {})
+      browser.action.setBadgeText({ text: '', tabId })
     }, 3000)
   }
 
@@ -216,8 +196,8 @@ async function handleInspectDomain(domain: string, tabId?: number): Promise<void
       browser.notifications.create({
         type: 'basic',
         iconUrl: browser.runtime.getURL('icons/icon-48.png'),
-        title: 'Domain Inspector+',
-        message: `Domain ${domain} is ready for inspection. Click the extension icon.`,
+        title: 'Domain Inspector Plus',
+        message: `Inspected domain: ${domain}`,
       })
     }
   }
@@ -246,21 +226,17 @@ function handleTabUpdate(
  * Обработчик установки/обновления
  */
 function handleInstall(details: browser.Runtime.OnInstalledDetailsType): void {
-  console.log('Extension installed/updated:', details.reason)
-
   if (details.reason === 'install') {
     // Первая установка - открываем welcome страницу
     browser.tabs.create({
-      url: browser.runtime.getURL('welcome.html'),
+      url: browser.runtime.getURL('pages/welcome.html'),
     })
+  } else if (details.reason === 'update') {
+    // Обновление - можно показать changelog
+    // browser.tabs.create({
+    //   url: browser.runtime.getURL('pages/changelog.html'),
+    // })
   }
-
-  // Сбрасываем состояние
-  browser.storage.local.set({
-    isEnabled: true,
-    apiEndpoint: '',
-    lastDomain: '',
-  })
 }
 
 /**

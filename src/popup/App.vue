@@ -15,16 +15,18 @@
   // Инициализация
   onMounted(async () => {
     try {
-      const result = await browser.storage.local.get(['lastDomain']) as { lastDomain?: string }
-      if (result.lastDomain) {
+      const result = await browser.storage.local.get('lastDomain')
+      
+      if (result.lastDomain && typeof result.lastDomain === 'string') {
         domainInput.value = result.lastDomain
+        
+        // Автоматически запускаем инспекцию
         await inspectDomain()
-        await browser.storage.local.remove('lastDomain')
       }
     } catch (error) {
-      console.error('Failed to get last domain:', error)
+      console.error('Storage error:', error)
     }
-
+    
     // Listen for Escape key
     window.addEventListener('keydown', handleGlobalKeydown)
   })
@@ -56,18 +58,22 @@
   const inspectDomain = async () => {
     if (!domainInput.value.trim()) return
 
+    const domain = domainInput.value.trim()
+    
     loading.value = true
     error.value = ''
     domainInfo.value = null
 
     try {
-      const response = await apiInspectDomain(domainInput.value.trim())
+      const response = await apiInspectDomain(domain)
+      
       if (response.success && response.data) {
         domainInfo.value = response.data
       } else {
         error.value = response.error || 'Failed to inspect domain'
       }
     } catch (err) {
+      console.error('Exception caught:', err)
       error.value = 'Connection error'
     } finally {
       loading.value = false
