@@ -15,6 +15,8 @@ let highlightedElements: HTMLElement[] = []
 let activePopup: HTMLElement | null = null
 let hideTimeout: number | null = null
 let mutationTimeout: number | null = null
+let scrollListener: ((event: Event) => void) | null = null
+let targetElement: HTMLElement | null = null
 
 /**
  * Дебаунс для обработки изменений DOM
@@ -165,6 +167,9 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
     hideTooltip()
   }
 
+  // Сохраняем ссылку на элемент
+  targetElement = element
+
   const rect = element.getBoundingClientRect()
   const popup = document.createElement('div')
   popup.className = CONFIG.popupClass
@@ -183,31 +188,45 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
     }, 300)
   })
 
-  // Позиционирование
-  const popupWidth = 240
-  const popupHeight = 40
-  let left = rect.left + window.scrollX
-  let top = rect.top + window.scrollY - popupHeight - 10
-  let arrowClass = '';
+  // Функция обновления позиции
+  const updatePosition = () => {
+    if (!popup.parentNode || !targetElement) return
 
-  // Проверка границ экрана
-  if (left + popupWidth > window.innerWidth) {
-    left = window.innerWidth - popupWidth - 20
-  }
-  
-  if (top < window.scrollY) {
-    top = rect.top + window.scrollY + rect.height + 10
-    arrowClass = 'tooltip-arrow-top';
-  }
+    const currentRect = targetElement.getBoundingClientRect()
+    const popupWidth = 240
+    const popupHeight = 40
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft
 
-  popup.style.position = 'fixed'
-  popup.style.left = `${left}px`
-  popup.style.top = `${top}px`
-  popup.style.zIndex = '2147483647'
+    // Вычисляем позицию с учетом скролла
+    let left = currentRect.left + scrollLeft
+    let top = currentRect.top + scrollTop - popupHeight - 10
+    let arrowClass = ''
+
+    // Проверка границ экрана
+    if (left + popupWidth > window.innerWidth) {
+      left = window.innerWidth - popupWidth - 20
+    }
+    
+    if (top < scrollTop) {
+      top = currentRect.top + scrollTop + currentRect.height + 10
+      arrowClass = 'tooltip-arrow-top'
+    }
+
+    popup.style.position = 'absolute'
+    popup.style.left = `${left}px`
+    popup.style.top = `${top}px`
+
+    // Обновляем класс стрелки
+    const tooltip = popup.querySelector('.domain-tooltip') as HTMLElement
+    if (tooltip) {
+      tooltip.className = `domain-tooltip ${arrowClass}`
+    }
+  }
 
   // Начальное состояние
   popup.innerHTML = `
-    <div class="domain-tooltip ${arrowClass}">
+    <div class="domain-tooltip">
       <div class="tooltip-content">
         <div class="domain-name">${domain}</div>
         <button class="inspect-btn">Inspect</button>
@@ -215,8 +234,19 @@ async function showTooltip(element: HTMLElement, domain: string): Promise<void> 
     </div>
   `
 
+  // Добавляем в DOM ПЕРЕД позиционированием
   document.body.appendChild(popup)
   activePopup = popup
+
+  // Начальное позиционирование ПОСЛЕ добавления в DOM
+  updatePosition()
+
+  // Добавляем слушатель скролла
+  scrollListener = () => {
+    updatePosition()
+  }
+  window.addEventListener('scroll', scrollListener, { passive: true })
+  window.addEventListener('resize', scrollListener, { passive: true })
 
   // Обработчик кнопки инспекции
   const inspectBtn = popup.querySelector('.inspect-btn')
@@ -235,6 +265,16 @@ function hideTooltip(): void {
     clearTimeout(hideTimeout)
     hideTimeout = null
   }
+  
+  // Удаляем слушатели скролла
+  if (scrollListener) {
+    window.removeEventListener('scroll', scrollListener)
+    window.removeEventListener('resize', scrollListener)
+    scrollListener = null
+  }
+  
+  // Сбрасываем ссылку на элемент
+  targetElement = null
   
   if (activePopup && activePopup.parentNode) {
     activePopup.parentNode.removeChild(activePopup)
