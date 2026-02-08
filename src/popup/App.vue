@@ -1,11 +1,10 @@
 <script setup lang="ts">
-  import { ref, onMounted, computed, watch } from 'vue'
+  import { ref, onMounted, watch } from 'vue'
   import browser from 'webextension-polyfill'
   import type { DomainInfo } from '@/lib/types'
-  import { formatDate, getCountryName, formatNS, copyToClipboard } from '@/lib/utils'
+  import { formatDate, getCountryName, formatNS, copyToClipboard, isValidDomain } from '@/lib/utils'
   import { inspectDomain as apiInspectDomain } from '@/lib/api'
 
-  const version = '0.1.0'
   const loading = ref(false)
   const error = ref('')
   const domainInput = ref('')
@@ -43,11 +42,6 @@
     }
   })
 
-  const isValidDomain = (domain: string) => {
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
-    return domainRegex.test(domain);
-  }
-
   const handleGlobalKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closePopup()
@@ -84,17 +78,18 @@
   const copyAllInfo = async () => {
     if (!domainInfo.value) return
 
-    const { primary, othersCount } = formatNS(domainInfo.value.ns)
+    const info = domainInfo.value
+    const { primary, othersCount } = formatNS(info.ns)
     const nsText = othersCount > 0 
       ? `${primary.join(', ')} and ${othersCount} more`
       : primary.join(', ')
 
     const text = [
-      `Domain: ${domainInfo.value.domain}`,
-      `Created: ${formatDate(domainInfo.value.created)}`,
-      `IP: ${domainInfo.value.ip}`,
-      `Country: ${getCountryName(domainInfo.value.country)}`,
-      `NS: ${domainInfo.value.ns.join(', ')}`
+      `Domain: ${info.domain}`,
+      `Created: ${formatDate(info.created)}`,
+      `IP: ${info.ip}`,
+      `Country: ${getCountryName(info.country)}`,
+      `NS: ${info.ns.join(', ')}`
     ].join('\n')
 
     const success = await copyToClipboard(text)
@@ -112,11 +107,6 @@
     error.value = ''
     inspectDomain()
   }
-
-  const formattedNS = computed(() => {
-    if (!domainInfo.value?.ns) return { primary: [], othersCount: 0 }
-    return formatNS(domainInfo.value.ns)
-  })
 </script>
 
 <template>
@@ -253,7 +243,7 @@
 
     <!-- Footer -->
     <div class="p-4 bg-sage-50 border-t border-sage-100 text-center">
-      <p class="text-[10px] text-sage-400 font-medium">Domain Inspector+ v{{ version }} • Powered by Vercel API</p>
+      <p class="text-[10px] text-sage-400 font-medium">Domain Inspector+ v0.1.0 • Powered by Vercel API</p>
     </div>
   </div>
 </template>

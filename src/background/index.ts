@@ -12,7 +12,7 @@ const state = {
  */
 async function initialize(): Promise<void> {
   // Загружаем сохраненные настройки
-  const result = await browser.storage.local.get(['isEnabled', 'apiEndpoint'])
+  const result = await browser.storage.local.get(['isEnabled'])
   state.isEnabled = (result as { isEnabled?: boolean }).isEnabled ?? true
 
   // Создаем контекстное меню

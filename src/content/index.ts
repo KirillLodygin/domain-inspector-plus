@@ -117,21 +117,15 @@ function findDomainNodes(): void {
 
   const nodesToProcess: Node[] = []
   let node: Node | null
-  let totalNodes = 0
-  let skippedNodes = 0
-  let processedNodes = 0
 
   while ((node = walker.nextNode())) {
-    totalNodes++
     const text = node.textContent
     if (!text || text.length < 4) {
-      skippedNodes++
       continue
     }
 
     const parent = node.parentNode as HTMLElement
     if (!parent || parent.closest(`.${CONFIG.highlightClass}`) || ['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT'].includes(parent.tagName) || parent.isContentEditable) {
-      skippedNodes++
       continue
     }
 
@@ -154,7 +148,6 @@ function findDomainNodes(): void {
     })
 
     if (isFile) {
-      skippedNodes++
       continue
     }
 
@@ -162,9 +155,6 @@ function findDomainNodes(): void {
     if (domainRegex.test(text)) {
       // Теперь подсвечиваем домены даже в ссылках
       nodesToProcess.push(node)
-      processedNodes++
-    } else {
-      skippedNodes++
     }
   }
   
@@ -182,7 +172,6 @@ function highlightInNode(node: Node, regex: RegExp): void {
 
   const fragment = document.createDocumentFragment()
   let lastIndex = 0
-  let domainsFound = 0
 
   regex.lastIndex = 0
   let match
@@ -218,7 +207,6 @@ function highlightInNode(node: Node, regex: RegExp): void {
     fragment.appendChild(span)
     highlightedElements.push(span)
 
-    domainsFound++
     lastIndex = regex.lastIndex
   }
 
